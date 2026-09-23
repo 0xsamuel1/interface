@@ -49,5 +49,29 @@ test("mobile menu is a modal dialog and locks body scroll", async ({ page }) => 
 
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()
+  await expect(burger).toBeFocused()
   expect(await page.evaluate(() => document.body.style.overflow)).not.toBe("hidden")
+})
+
+test("faq survives rapid toggles and enlarged text without trapping hidden links", async ({ page }) => {
+  await page.goto("/")
+  const trigger = page.getByRole("button", { name: /what is so4/i })
+  await trigger.focus()
+  await trigger.press("Enter")
+  await trigger.press("Enter")
+  await trigger.press("Enter")
+  await expect(trigger).toHaveAttribute("aria-expanded", "true")
+
+  const panel = page.locator(`#${await trigger.getAttribute("aria-controls")}`)
+  await page.evaluate(() => { document.documentElement.style.zoom = "2" })
+  await expect(panel).toHaveAttribute("aria-hidden", "false")
+  await expect(panel.locator("a")).toBeVisible()
+  await expect.poll(() => panel.evaluate((el) => {
+    const answer = el.firstElementChild
+    return answer ? answer.scrollHeight <= answer.clientHeight + 1 : false
+  })).toBe(true)
+
+  await trigger.press("Enter")
+  await expect(panel).toHaveAttribute("inert", "")
+  await expect(trigger).toBeFocused()
 })
