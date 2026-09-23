@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { Button } from "@workspace/ui/components/button"
+import type { MouseEvent, Ref } from "react"
 
 // ── Shared classes ──
 
@@ -64,7 +65,10 @@ export function SiteLogo({ variant = "app" }: SiteLogoProps) {
         </svg>
       </span>
       <span className="font-mono-num text-17 font-medium tracking-[0.02em] text-foreground">
-        so4<span className="text-muted-foreground max-[380px]:hidden">.market</span>
+        so4
+        <span className="text-muted-foreground max-[380px]:hidden">
+          .market
+        </span>
       </span>
     </>
   )
@@ -88,25 +92,52 @@ export function SiteLogo({ variant = "app" }: SiteLogoProps) {
 
 interface HamburgerButtonProps {
   open: boolean
-  onToggle: () => void
+  onToggle: (event: MouseEvent<HTMLButtonElement>) => void
+  buttonRef?: Ref<HTMLButtonElement>
+  controls?: string
+  className?: string
 }
 
-export function HamburgerButton({ open, onToggle }: HamburgerButtonProps) {
+export function HamburgerButton({
+  open,
+  onToggle,
+  buttonRef,
+  controls,
+  className = "md:hidden",
+}: HamburgerButtonProps) {
   return (
     <Button
+      ref={buttonRef}
       variant="ghost"
       size="icon"
-      className="md:hidden"
+      className={className}
       aria-label={open ? "Close menu" : "Open menu"}
       aria-expanded={open}
+      aria-controls={controls}
       onClick={onToggle}
     >
       {open ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
           <path d="M18 6 6 18M6 6l12 12" />
         </svg>
       ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
           <path d="M3 12h18M3 6h18M3 18h18" />
         </svg>
       )}

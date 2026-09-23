@@ -42,7 +42,7 @@ export function SocialSection() {
           <div className="flex flex-wrap gap-9">
             {SOCIAL_STATS.map(({ name, value, href }) => (
               <a key={name} href={href} target="_blank" rel="noreferrer" className="group">
-                <div className="text-14 text-gmx-slate-500 transition-all duration-180 group-hover:translate-x-0.5 group-hover:text-gmx-blue-300">
+                <div className="text-14 text-gmx-slate-500 transition-colors duration-180 group-hover:text-gmx-blue-300 group-focus-visible:text-gmx-blue-300">
                   {name}
                 </div>
                 <div className="mt-1 text-40 font-medium text-white">{value}</div>
