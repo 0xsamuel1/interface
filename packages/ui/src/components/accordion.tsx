@@ -163,7 +163,10 @@ function AccordionItem({
         data-slot="accordion-item"
         data-state={open ? "open" : "closed"}
         data-disabled={disabled ? "" : undefined}
-        className={cn("border-b border-border/60 last:border-b-0", className)}
+        className={cn(
+          "group border-b border-border/60 last:border-b-0",
+          className
+        )}
         {...props}
       />
     </AccordionItemContext.Provider>
@@ -247,13 +250,17 @@ function AccordionContent({
       data-slot="accordion-content"
       data-state={open ? "open" : "closed"}
       className={cn(
-        "grid overflow-hidden text-11 leading-relaxed text-muted-foreground transition-[grid-template-rows,padding-bottom] duration-200 motion-reduce:transition-none",
-        open ? "grid-rows-[1fr] pb-3" : "grid-rows-[0fr] pb-0",
+        "grid overflow-hidden text-11 leading-relaxed text-muted-foreground transition-[grid-template-rows] duration-200 motion-reduce:transition-none",
+        open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         className
       )}
       {...props}
     >
-      <div className="min-h-0 overflow-hidden">{children}</div>
+      <div className="min-h-0 overflow-hidden">
+        <div className="pb-3 opacity-0 transition-opacity duration-200 group-data-[state=open]:opacity-100 motion-reduce:transition-none">
+          {children}
+        </div>
+      </div>
     </div>
   )
 }
