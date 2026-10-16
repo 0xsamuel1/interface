@@ -134,22 +134,6 @@ export const Route = createRootRoute({
       { rel: "dns-prefetch", href: "//indexer.example.com" },
       { rel: "dns-prefetch", href: "//rpc.example.com" },
 
-      // ── Preload Critical Assets ─────────────────────────────────
-      {
-        rel: "preload",
-        as: "font",
-        href: "/fonts/inter-400.woff2",
-        type: "font/woff2",
-        crossOrigin: "anonymous",
-      },
-      {
-        rel: "preload",
-        as: "font",
-        href: "/fonts/inter-600.woff2",
-        type: "font/woff2",
-        crossOrigin: "anonymous",
-      },
-
       // ── App CSS ─────────────────────────────────────────────────
       { rel: "stylesheet", href: appCss },
     ],
