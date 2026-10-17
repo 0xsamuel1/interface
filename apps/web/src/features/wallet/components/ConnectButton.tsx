@@ -278,7 +278,7 @@ function WalletModal({
   )
   const sep7Uri = useMemo(() => {
     const origin =
-      typeof window === "undefined" ? "https://so4.markets" : window.location.origin
+      typeof window === "undefined" ? "https://so4.market" : window.location.origin
     const callbackUrl = new URL("/", origin).toString()
 
     if (pendingTransactionXdr) {
