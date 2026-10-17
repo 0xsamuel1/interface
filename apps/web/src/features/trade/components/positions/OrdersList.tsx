@@ -194,6 +194,7 @@ export function OrdersList() {
         <DataTable
           columns={columns}
           data={orders}
+          animateRows
           isLoading={isLoading}
           emptyMessage={isDisabled ? "Indexer disabled - showing contract-only data" : "No open orders"}
           keyExtractor={(o) => o.clientOrderId}
