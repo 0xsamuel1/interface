@@ -217,7 +217,7 @@ export function DepthLadder({ symbol, compact = false }: Props) {
   // OB-054: Determine reference price — prefer last trade, fall back to mid price
   const lastTradePrice = trades.length > 0 ? trades[0].price : null
   const referencePrice = lastTradePrice ?? midPrice
-  const referencePriceLabel = lastTradePrice !== null ? "Last" : midPrice !== null ? "Mid" : "Mark"
+  const referencePriceLabel = lastTradePrice ? "Last" : midPrice ? "Mid" : "Mark"
 
   // OB-056: Cumulative depth inspection state
   const [hoveredLevel, setHoveredLevel] = useState<{ level: OrderBookLevel; side: "bid" | "ask" } | null>(null)
