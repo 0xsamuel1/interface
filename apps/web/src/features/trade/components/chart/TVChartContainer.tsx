@@ -23,6 +23,9 @@ import {
   getChartPalette,
   positionLineColor,
 } from "../../lib/chart-theme"
+import type { CandlestickData, IChartApi, IPriceLine, ISeriesApi, UTCTimestamp } from "lightweight-charts"
+import type { OhlcBar } from "../../lib/oracle"
+import { useWalletStore } from "@/features/wallet/store/wallet-store"
 import { formatUsd } from "@/shared/lib/format"
 import { ENV } from "@/app/config/env"
 import type { CandlestickData, IChartApi, IPriceLine, ISeriesApi, UTCTimestamp } from "lightweight-charts"

@@ -24,6 +24,7 @@ import { useMarketRiskParams } from "../../hooks/useMarketRiskParams"
 import { validateExecutionRequest } from "../../lib/execution-support"
 import type { DecreaseOrderParams, IncreaseOrderParams } from "../../lib/stellar"
 import type { useTradeState } from "../../hooks/useTradeState"
+import { ENV } from "@/app/config/env"
 import { applyReferralCode } from "@/features/referrals/lib/referrals"
 import {
   buildBatchOrderTransaction,
