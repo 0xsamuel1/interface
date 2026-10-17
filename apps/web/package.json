@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:cache-headers": "bun test scripts/nitro-cache-headers.test.ts"
   },
   "dependencies": {
     "@creit.tech/stellar-wallets-kit": "^2.4.0",
@@ -21,7 +22,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-query": "^5.100.9",
     "@tanstack/react-router": "^1.132.0",
-    "@tanstack/react-start": "^1.132.0",
+    "@tanstack/react-start": "~1.168.61",
     "@tanstack/router-plugin": "^1.132.0",
     "@workspace/ui": "workspace:*",
     "lightweight-charts": "^5.2.0",
@@ -51,6 +52,7 @@
     "happy-dom": "^20.10.6",
     "msw": "^2.14.6",
     "qrcode.react": "^4.2.0",
+    "rou3": "^1.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.2",
     "vitest": "^4.1.12",
