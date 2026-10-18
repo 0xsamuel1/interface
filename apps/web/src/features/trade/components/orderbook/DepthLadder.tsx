@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { cn } from "@workspace/ui/lib/utils"
 import { useOrderBook } from "../../hooks/useOrderBook"
 import { useRecentTrades } from "../../hooks/useRecentTrades"
@@ -23,6 +23,33 @@ function DepthRow({ level, side, compact, onHover }: RowProps) {
   const isBid = side === "bid"
   const depthPct = `${(level.depth * 100).toFixed(1)}%`
 
+  // OB-011 / issue 873: 300ms price-tick flash on level size/price update
+  const [flashDirection, setFlashDirection] = useState<"up" | "down" | null>(null)
+  const prevSizeRef = useRef(level.size)
+  const prevPriceRef = useRef(level.price)
+  const flashKeyRef = useRef(0)
+
+  useEffect(() => {
+    const sizeChanged = prevSizeRef.current !== level.size
+    const priceChanged = prevPriceRef.current !== level.price
+
+    if (sizeChanged || priceChanged) {
+      const isUp = priceChanged
+        ? level.price > prevPriceRef.current
+        : level.size > prevSizeRef.current
+
+      prevSizeRef.current = level.size
+      prevPriceRef.current = level.price
+      flashKeyRef.current += 1
+      setFlashDirection(isUp ? "up" : "down")
+
+      const timer = setTimeout(() => {
+        setFlashDirection(null)
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [level.size, level.price])
+
   return (
     <div
       role="row"
@@ -38,6 +65,17 @@ function DepthRow({ level, side, compact, onHover }: RowProps) {
       tabIndex={0}
       aria-label={`${isBid ? "Bid" : "Ask"} at ${formatUsd(level.price, { decimals: 2 })}, size ${level.size.toFixed(4)}, cumulative ${level.total.toFixed(4)}`}
     >
+      {/* 300ms price-tick flash overlay — zero layout shift, opacity only */}
+      {flashDirection && (
+        <div
+          key={flashKeyRef.current}
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute inset-0 z-0",
+            flashDirection === "up" ? "so4-flash-up-overlay" : "so4-flash-down-overlay",
+          )}
+        />
+      )}
       {/* depth fill — absolutely positioned behind text */}
       <div
         aria-hidden="true"
@@ -170,6 +208,27 @@ function SpreadRow({
   referencePrice: number | null
   referencePriceLabel: string
 }) {
+  // OB-011 / issue 873: 300ms price-tick flash on last/reference price update
+  const [flashDirection, setFlashDirection] = useState<"up" | "down" | null>(null)
+  const prevPriceRef = useRef(referencePrice)
+  const flashKeyRef = useRef(0)
+
+  useEffect(() => {
+    if (referencePrice !== null && prevPriceRef.current !== null && referencePrice !== prevPriceRef.current) {
+      const isUp = referencePrice > prevPriceRef.current
+      prevPriceRef.current = referencePrice
+      flashKeyRef.current += 1
+      setFlashDirection(isUp ? "up" : "down")
+
+      const timer = setTimeout(() => {
+        setFlashDirection(null)
+      }, 300)
+      return () => clearTimeout(timer)
+    } else if (referencePrice !== null && prevPriceRef.current === null) {
+      prevPriceRef.current = referencePrice
+    }
+  }, [referencePrice])
+
   return (
     <div
       role="separator"
@@ -188,18 +247,39 @@ function SpreadRow({
         {spreadPct !== null && <span className="ml-1">({spreadPct.toFixed(3)}%)</span>}
       </span>
       {referencePrice !== null && (
-        <span title={referencePriceLabel}>
-          {referencePriceLabel === "Last" && (
-            <span className="mr-0.5 opacity-60">Last</span>
+        <span
+          title={referencePriceLabel}
+          className="relative inline-flex items-center px-1 py-0.5 rounded overflow-hidden"
+        >
+          {flashDirection && (
+            <span
+              key={flashKeyRef.current}
+              aria-hidden="true"
+              className={cn(
+                "pointer-events-none absolute inset-0 z-0 rounded",
+                flashDirection === "up" ? "so4-flash-up-overlay" : "so4-flash-down-overlay",
+              )}
+            />
           )}
-          {referencePriceLabel === "Mid" && (
-            <span className="mr-0.5 opacity-60">Mid</span>
-          )}
-          {referencePriceLabel === "Mark" && (
-            <span className="mr-0.5 opacity-60">Mark</span>
-          )}
-          <span className="text-foreground/70">
-            {formatUsd(referencePrice, { decimals: 2 })}
+          <span className="relative z-10 flex items-center">
+            {referencePriceLabel === "Last" && (
+              <span className="mr-0.5 opacity-60">Last</span>
+            )}
+            {referencePriceLabel === "Mid" && (
+              <span className="mr-0.5 opacity-60">Mid</span>
+            )}
+            {referencePriceLabel === "Mark" && (
+              <span className="mr-0.5 opacity-60">Mark</span>
+            )}
+            <span
+              className={cn(
+                "text-foreground/70",
+                flashDirection === "up" && "text-green-500",
+                flashDirection === "down" && "text-red-500",
+              )}
+            >
+              {formatUsd(referencePrice, { decimals: 2 })}
+            </span>
           </span>
         </span>
       )}

@@ -8,6 +8,7 @@
 // All public functions accept any of the three forms and resolve internally.
 
 import { ENV } from "../../../app/config/env"
+import { CONTRACTS } from "@/app/config/contracts"
 import { fetchPythAttestations } from "./pyth"
 import { formatPct } from "@/shared/lib/format"
 
@@ -55,12 +56,12 @@ function resolveBaseSymbol(symbolOrAddress: string): string {
   if (BINANCE_SYMBOL[symbolOrAddress]) return symbolOrAddress
   // Test token symbol (TWBTC → BTC)
   if (TEST_TO_BASE[symbolOrAddress]) return TEST_TO_BASE[symbolOrAddress]
-  // Contract address — map via ENV token addresses
+  // Contract address — map via CONTRACTS token addresses
   const addrMap: Record<string, string> = {
-    [ENV.CONTRACTS.TOKENS.TWBTC]: "BTC",
-    [ENV.CONTRACTS.TOKENS.TETH]:  "ETH",
-    [ENV.CONTRACTS.TOKENS.TXLM]:  "XLM",
-    [ENV.CONTRACTS.TOKENS.TUSDC]: "USDC",
+    [CONTRACTS.tokens.twbtc]: "BTC",
+    [CONTRACTS.tokens.teth]:  "ETH",
+    [CONTRACTS.tokens.txlm]:  "XLM",
+    [CONTRACTS.tokens.tusdc]: "USDC",
   }
   return addrMap[symbolOrAddress] ?? symbolOrAddress
 }
