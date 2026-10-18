@@ -287,6 +287,13 @@
     --radius-12: 0.75rem; /* 12px — sponsor logo cards */
     --radius-20: 1.25rem; /* 20px — feature/pool/program cards */
 
+    /* Skeleton loading sheen (transform-only) */
+    --animate-skeleton-sweep: skeleton-sweep 1.5s ease-in-out infinite;
+    @keyframes skeleton-sweep {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(100%); }
+    }
+
     /* Hero title word-rotation (AnimatedTitle) */
     --animate-title-in: title-in 0.25s ease-in-out forwards;
     --animate-title-out: title-out 0.25s ease-in-out forwards;
@@ -992,3 +999,7 @@
 :root[data-reduced-motion="true"] .so4-confirm-check,
 :root[data-reduced-motion="true"] .so4-confirm-moment { animation: none; }
 :root[data-reduced-motion="true"] [data-slot="tooltip-content"] { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+    [data-slot="skeleton"]::before { animation: none; display: none; }
+}
+:root[data-reduced-motion="true"] [data-slot="skeleton"]::before { animation: none; display: none; }
