@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 import { Button } from "@workspace/ui/components/button"
+import { cn } from "@workspace/ui/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import { createSwapOrder, sendBatchOrderTxn } from "../../lib/stellar"
 import { formatUsd } from "../../lib/trade-math"
@@ -447,9 +448,30 @@ export function ConfirmationDialog({
                   : ""
             }
           >
-            {isSubmitting
-              ? "Submitting..."
-              : `Confirm ${typeLabel}`}
+            <span className="grid place-items-center">
+              <span
+                aria-hidden={isSubmitting}
+                className={cn(
+                  "col-start-1 row-start-1 transition-opacity duration-base ease-out",
+                  isSubmitting ? "opacity-0" : "opacity-100"
+                )}
+              >
+                {`Confirm ${typeLabel}`}
+              </span>
+              <span
+                aria-hidden={!isSubmitting}
+                className={cn(
+                  "col-start-1 row-start-1 flex items-center gap-2 transition-opacity duration-base ease-out",
+                  isSubmitting ? "opacity-100" : "opacity-0"
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                />
+                Submitting...
+              </span>
+            </span>
           </Button>
         </DialogFooter>
       </DialogContent>
