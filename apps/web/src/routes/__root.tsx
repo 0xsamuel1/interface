@@ -11,6 +11,7 @@ import { DensityProvider } from "@workspace/ui/components/density-provider"
 import appCss from "@workspace/ui/globals.css?url"
 import { AppProviders } from "../app/providers"
 import { RouteAnnouncer } from "../shared/components/RouteAnnouncer"
+import { RouteProgressBar } from "../shared/components/RouteProgressBar"
 
 // Update this to your production domain before going live.
 const SITE_URL = "https://levee.market"
@@ -194,6 +195,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <AppProviders>
             <TooltipProvider delay={500} timeout={400} closeDelay={0}>
               <ToastProvider>
+                <RouteProgressBar />
                 {children}
               </ToastProvider>
             </TooltipProvider>
