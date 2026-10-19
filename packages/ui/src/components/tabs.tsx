@@ -43,15 +43,27 @@ const tabsListVariants = cva(
 function TabsList({
   className,
   variant = "default",
+  children,
   ...props
 }: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn(tabsListVariants({ variant }), "relative", className)}
       {...props}
-    />
+    >
+      <TabsPrimitive.Indicator
+        data-slot="tabs-indicator"
+        className={cn(
+          "absolute z-0 transition-[left,top,width,height,transform] duration-base ease-spring-smooth motion-reduce:transition-none pointer-events-none",
+          variant === "line"
+            ? "group-data-horizontal/tabs:bottom-0 group-data-horizontal/tabs:h-0.5 group-data-vertical/tabs:right-0 group-data-vertical/tabs:w-0.5 bg-foreground"
+            : "rounded-md bg-background shadow-xs dark:bg-input/40 dark:border dark:border-input"
+        )}
+      />
+      {children}
+    </TabsPrimitive.List>
   )
 }
 

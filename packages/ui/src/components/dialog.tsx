@@ -54,7 +54,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // Positioning & sizing
-          "fixed top-1/2 inset-inline-start-1/2 z-50 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2",
+          "fixed top-1/2 inset-inline-start-1/2 z-50 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 origin-(--transform-origin)",
           // Mobile: cap height so content scrolls inside rather than overflowing the viewport
           "max-h-[calc(100dvh-2rem)] overflow-x-hidden overflow-y-auto",
           // Layout, surface, typography
