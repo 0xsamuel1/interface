@@ -5,6 +5,7 @@ import { useState } from "react"
 import { useOrders, type Order } from "../../hooks/useOrders"
 import { cancelOrder } from "../../lib/stellar"
 import { formatUsd } from "../../lib/trade-math"
+import { OrderCancelDialog } from "./OrderCancelDialog"
 import type { OrderKey } from "@/lib/contracts/generated/exchange-router/src"
 
 function toOrderKey(order: Order): OrderKey {
@@ -19,14 +20,22 @@ function toOrderKey(order: Order): OrderKey {
 export function OrdersList() {
   const { data: orders = [], isLoading } = useOrders()
   const [cancelling, setCancelling] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
 
   async function handleCancel(order: Order) {
     setCancelling(order.key)
     try {
       await cancelOrder(order.account, toOrderKey(order))
+      setDialogOpen(false)
     } finally {
       setCancelling(null)
     }
+  }
+
+  function openCancelDialog(order: Order) {
+    setSelectedOrder(order)
+    setDialogOpen(true)
   }
 
   if (isLoading) {
@@ -90,7 +99,7 @@ export function OrdersList() {
                   size="xs"
                   variant="outline"
                   disabled={cancelling === o.key}
-                  onClick={() => void handleCancel(o)}
+                  onClick={() => openCancelDialog(o)}
                 >
                   {cancelling === o.key ? "…" : "Cancel"}
                 </Button>
@@ -99,6 +108,14 @@ export function OrdersList() {
           ))}
         </tbody>
       </table>
+
+      <OrderCancelDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        order={selectedOrder}
+        isSubmitting={cancelling === selectedOrder?.key}
+        onConfirm={() => selectedOrder && void handleCancel(selectedOrder)}
+      />
     </div>
   )
 }
