@@ -3,6 +3,7 @@ import { toast } from "@workspace/ui/components/toast"
 import { sendAndPoll } from "@/lib/tx-builder"
 import { explorerTxUrl } from "@/app/config/network"
 import { useTxFeedback } from "./useTxFeedback"
+import { haptic } from "@/shared/lib/haptics"
 
 export type SubmitTxOptions = {
   loadingMessage: string
@@ -46,6 +47,7 @@ export async function submitTx(
         </div>
       ),
     })
+    haptic("success")
 
     // Execute onSuccess as a side effect after transaction confirmation,
     // but don't let its errors overwrite transaction success state
@@ -64,6 +66,7 @@ export async function submitTx(
   } catch (error) {
     const message = options.onError?.(error) ?? "Transaction failed"
     toast.error(message, { id: toastId })
+    haptic("error")
     throw error
   }
 }
@@ -166,6 +169,7 @@ export function useTxSubmit() {
           message: options.successMessage,
           description: options.successDescription?.(hash),
         })
+        haptic("success")
 
         setState({ isLoading: false, txHash: hash, error: null })
         submitInProgressRef.current = false
@@ -173,6 +177,7 @@ export function useTxSubmit() {
       } catch (error) {
         const message = options.onError?.(error) ?? "Transaction failed"
         feedback.handleEvent({ type: "error", message })
+        haptic("error")
         setState({
           isLoading: false,
           txHash: null,
