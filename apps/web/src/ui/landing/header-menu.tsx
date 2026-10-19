@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { HamburgerButton, SiteLogo, useMobileMenu } from "../nav/primitives"
+import { useScrollHeader } from "@/shared/hooks/useScrollHeader"
 
 const NAV_LINKS: Array<{
   label: string
@@ -38,6 +39,7 @@ export function HeaderMenu() {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const desktopNavRef = useRef<HTMLUListElement>(null)
   const [instant, setInstant] = useState(false)
+  const { scrolled, hidden } = useScrollHeader()
   const restoreTrigger = useCallback(() => {
     setInstant(true)
     triggerRef.current?.focus()
@@ -98,8 +100,12 @@ export function HeaderMenu() {
   }, [open])
 
   return (
-    <header className="fixed top-0 z-30 w-full bg-gmx-slate-900">
-      <div className="mx-auto flex h-16 max-w-300 items-center justify-between px-4 sm:px-10">
+    <header
+      data-scrolled={scrolled}
+      data-hidden={hidden}
+      className="so4-scroll-header so4-scroll-header--compact fixed top-0 z-30 w-full bg-gmx-slate-900"
+    >
+      <div className="so4-scroll-header__inner mx-auto flex h-16 max-w-300 items-center justify-between px-4 sm:px-10">
         {/* SiteLogo renders its own <a href="/"> — do not wrap it in
             another anchor (nested <a> is invalid HTML and breaks
             hydration for the whole route). */}
