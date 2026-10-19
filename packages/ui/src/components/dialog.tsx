@@ -30,10 +30,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/80 supports-backdrop-filter:backdrop-blur-xs",
-        "data-open:duration-base data-open:ease-out data-open:animate-in data-open:fade-in-0",
-        "data-closed:duration-fast data-closed:ease-in data-closed:animate-out data-closed:fade-out-0",
-        "motion-reduce:duration-0 motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none",
+        "so4-dialog-overlay fixed inset-0 isolate z-50 bg-black/80 supports-backdrop-filter:backdrop-blur-xs",
         className
       )}
       {...props}
@@ -67,10 +64,8 @@ function DialogContent({
           "max-sm:safe-top max-sm:safe-bottom max-sm:safe-left max-sm:safe-right",
           // Desktop max-width default
           "sm:max-w-sm",
-          // Enter / exit animations: spring in, quicker ease-out exit
-          "data-open:duration-moderate data-open:ease-spring-smooth data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
-          "data-closed:duration-fast data-closed:ease-out data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          "motion-reduce:duration-0 motion-reduce:data-open:animate-none motion-reduce:data-closed:animate-none",
+          // Enter / exit animations
+          "so4-dialog-content",
           className
         )}
         {...props}
