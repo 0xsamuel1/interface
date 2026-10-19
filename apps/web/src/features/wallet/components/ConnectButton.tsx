@@ -19,6 +19,7 @@ import type { ComponentProps } from "react"
 import { useKeyboardShortcut } from "@/shared/hooks/useKeyboardShortcut"
 import { useWallet } from "@/app/providers"
 import { NETWORK } from "@/app/config/network"
+import { SITE_URL } from "@/shared/lib/site-identity"
 
 type ConnectButtonProps = Omit<
   ComponentProps<typeof Button>,
@@ -278,7 +279,7 @@ function WalletModal({
   )
   const sep7Uri = useMemo(() => {
     const origin =
-      typeof window === "undefined" ? "https://so4.market" : window.location.origin
+      typeof window === "undefined" ? SITE_URL : window.location.origin
     const callbackUrl = new URL("/", origin).toString()
 
     if (pendingTransactionXdr) {

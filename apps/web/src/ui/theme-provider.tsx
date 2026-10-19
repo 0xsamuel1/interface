@@ -58,7 +58,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       resolve(next) === resolve(theme) ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
       document.documentElement.dataset.reducedMotion === "true" ||
-      !document.startViewTransition
+      !Reflect.has(document, "startViewTransition")
     ) {
       activeTransition.current?.skipTransition()
       apply()

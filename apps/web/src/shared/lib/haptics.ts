@@ -11,7 +11,7 @@ export function haptic(kind: HapticKind): void {
   if (
     typeof navigator === "undefined" ||
     document.documentElement.dataset.reducedMotion === "true" ||
-    !navigator.vibrate
+    !Reflect.has(navigator, "vibrate")
   ) return
 
   navigator.vibrate(patterns[kind])
