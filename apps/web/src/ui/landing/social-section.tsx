@@ -1,5 +1,6 @@
 import { NewsletterForm } from "./newsletter-form"
 import { SocialSlider } from "./social-slider"
+import { SOCIAL_URLS } from "@/shared/lib/site-identity"
 
 // Counts stay "-" — no social account has a real follower count to report
 // yet, and a fabricated number is worse than an honest placeholder. URLs
@@ -8,10 +9,10 @@ import { SocialSlider } from "./social-slider"
 // the page is internally consistent; GitHub is the one link that's
 // definitely real (this repo).
 const SOCIAL_STATS = [
-  { name: "Discord", value: "-", href: "https://discord.gg/so4market" },
-  { name: "X", value: "-", href: "https://twitter.com/so4market" },
-  { name: "Telegram", value: "-", href: "https://t.me/so4market" },
-  { name: "GitHub", value: "Join", href: "https://github.com/Levee-HQ/interface" },
+  { name: "Discord", value: "-", href: SOCIAL_URLS.discord },
+  { name: "X", value: "-", href: SOCIAL_URLS.x },
+  { name: "Telegram", value: "-", href: SOCIAL_URLS.telegram },
+  { name: "GitHub", value: "Join", href: SOCIAL_URLS.github },
 ]
 
 // GMX's referral-terms/media-kit/terms pages don't exist for SO4 yet — no

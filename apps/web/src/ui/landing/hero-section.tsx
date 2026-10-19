@@ -1,15 +1,26 @@
 import { Link } from "@tanstack/react-router"
 import { AnimatedTitle } from "./animated-title"
+import { CountUp } from "./count-up"
 import { FeatureGrid } from "./feature-grid"
 import { useLandingStats } from "./use-landing-stats"
 import { useHeroFirstLoadSequence } from "./hooks/useHeroFirstLoadSequence"
 import { shortFormat, shortFormatUsd } from "./utils/formatters"
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  format,
+}: {
+  label: string
+  value: number | null
+  format: (value: number) => string
+}) {
   return (
     <div>
       <div className="text-12 text-gmx-slate-400 sm:text-14">{label}</div>
-      <div className="mt-1 text-30 font-medium tracking-tight text-white sm:text-40">{value}</div>
+      <div className="mt-1 text-30 font-medium tracking-tight text-white sm:text-40">
+        <CountUp value={value} format={format} />
+      </div>
     </div>
   )
 }
@@ -68,14 +79,16 @@ export function HeroSection() {
           </div>
 
           <div className="flex gap-9 sm:gap-15">
-            <Stat label="Traders" value={stats.traders === null ? "-" : shortFormat(stats.traders)} />
+            <Stat label="Traders" value={stats.traders} format={shortFormat} />
             <Stat
               label="Open interest"
-              value={stats.openInterest === null ? "-" : shortFormatUsd(stats.openInterest)}
+              value={stats.openInterest}
+              format={shortFormatUsd}
             />
             <Stat
               label="Total volume"
-              value={stats.totalVolume === null ? "-" : shortFormatUsd(stats.totalVolume)}
+              value={stats.totalVolume}
+              format={shortFormatUsd}
             />
           </div>
         </div>
