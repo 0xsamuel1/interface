@@ -5,7 +5,7 @@ import type { MouseEvent, Ref } from "react"
 
 // ── Shared classes ──
 
-// #884: the bottom hairline is drawn by .so4-scroll-header::after so it can fade
+// Issue 884: the bottom hairline is drawn by .so4-scroll-header::after so it can fade
 // in as a composited layer instead of toggling layout-affecting borders.
 export const navOuterClass =
   "sticky top-0 z-50 bg-background/80 backdrop-blur-md backdrop-saturate-150"

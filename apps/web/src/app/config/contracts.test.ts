@@ -1,11 +1,7 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
+import { CONTRACT_DEPLOYMENTS, getContractAddresses } from "@workspace/contracts"
 import { CONTRACTS } from "./contracts"
-import {
-  getContractAddresses,
-  CONTRACT_DEPLOYMENTS,
-  type SupportedNetwork,
-} from "@workspace/contracts"
 
 describe("Contract addresses resolution (#860)", () => {
   it("resolves all required contracts for testnet", () => {
@@ -40,7 +36,7 @@ describe("Contract addresses resolution (#860)", () => {
 
   it("throws error for unknown network", () => {
     assert.throws(
-      () => getContractAddresses("unknown" as SupportedNetwork),
+      () => getContractAddresses("unknown"),
       /Unknown network "unknown" in contracts\.json/,
     )
   })

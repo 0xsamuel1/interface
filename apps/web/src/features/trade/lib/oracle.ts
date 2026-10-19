@@ -8,8 +8,8 @@
 // All public functions accept any of the three forms and resolve internally.
 
 import { ENV } from "../../../app/config/env"
-import { CONTRACTS } from "@/app/config/contracts"
 import { fetchPythAttestations } from "./pyth"
+import { CONTRACTS } from "@/app/config/contracts"
 import { formatPct } from "@/shared/lib/format"
 
 export type PriceSource = "pyth" | "binance" | "gmx" | "fallback"

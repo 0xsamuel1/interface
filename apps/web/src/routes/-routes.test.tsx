@@ -278,12 +278,10 @@ describe("route smoke tests", () => {
     it("throws notFound in production", async () => {
       const origDev = import.meta.env.DEV
       try {
-        // @ts-expect-error mutating import.meta.env for test
         import.meta.env.DEV = false
         const { Route } = await import("./gallery")
-        expect(() => Route.options.beforeLoad?.()).toThrow()
+        expect(() => Reflect.apply(Route.options.beforeLoad!, undefined, [])).toThrow()
       } finally {
-        // @ts-expect-error restoring import.meta.env
         import.meta.env.DEV = origDev
       }
     })
@@ -291,12 +289,10 @@ describe("route smoke tests", () => {
     it("allows loading in dev mode", async () => {
       const origDev = import.meta.env.DEV
       try {
-        // @ts-expect-error mutating import.meta.env for test
         import.meta.env.DEV = true
         const { Route } = await import("./gallery")
-        expect(() => Route.options.beforeLoad?.()).not.toThrow()
+        expect(() => Reflect.apply(Route.options.beforeLoad!, undefined, [])).not.toThrow()
       } finally {
-        // @ts-expect-error restoring import.meta.env
         import.meta.env.DEV = origDev
       }
     })
@@ -306,12 +302,10 @@ describe("route smoke tests", () => {
     it("throws notFound in production", async () => {
       const origDev = import.meta.env.DEV
       try {
-        // @ts-expect-error mutating import.meta.env for test
         import.meta.env.DEV = false
         const { Route } = await import("./design-system")
-        expect(() => Route.options.beforeLoad?.()).toThrow()
+        expect(() => Reflect.apply(Route.options.beforeLoad!, undefined, [])).toThrow()
       } finally {
-        // @ts-expect-error restoring import.meta.env
         import.meta.env.DEV = origDev
       }
     })
@@ -319,12 +313,10 @@ describe("route smoke tests", () => {
     it("allows loading in dev mode", async () => {
       const origDev = import.meta.env.DEV
       try {
-        // @ts-expect-error mutating import.meta.env for test
         import.meta.env.DEV = true
         const { Route } = await import("./design-system")
-        expect(() => Route.options.beforeLoad?.()).not.toThrow()
+        expect(() => Reflect.apply(Route.options.beforeLoad!, undefined, [])).not.toThrow()
       } finally {
-        // @ts-expect-error restoring import.meta.env
         import.meta.env.DEV = origDev
       }
     })

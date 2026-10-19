@@ -44,7 +44,7 @@ type TradePanelProps = {
 }
 
 export function TradePanel({ trade }: TradePanelProps) {
-  const { getMidPrice, isStale } = useTokenPrices()
+  const { getMidPrice, getPrice, isStale } = useTokenPrices()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmedHash, setConfirmedHash] = useState<string | null>(null)
   const [priceValidationError, setPriceValidationError] = useState<string | null>(null)
@@ -114,6 +114,7 @@ export function TradePanel({ trade }: TradePanelProps) {
 
   const priceStale = isStale(toTokenAddress)
   const toTokenLabel = formatTokenLabel(toTokenAddress)
+  const activePrice = getPrice(toTokenAddress)
   const canTrade = Boolean(account) && sizeUsd > 0 && !priceStale &&
     (tradeFlags.isSwap || marketRisk.state === "available")
 
@@ -145,6 +146,9 @@ export function TradePanel({ trade }: TradePanelProps) {
 
   return (
     <div className="flex min-w-0 flex-col gap-3 p-4">
+      <p role="status" aria-label="Active price source" className="text-xs text-muted-foreground">
+        Price source: {activePrice?.source === "pyth" ? "Pyth Hermes" : activePrice?.source === "binance" ? "Binance reference" : activePrice?.source === "gmx" ? "GMX reference" : activePrice?.source === "fallback" ? "Illustrative fallback (not live)" : "Unavailable"}
+      </p>
       {/* ── Trade type tabs: Long / Short / Swap ───────────────────── */}
       <Tabs
         value={tradeType}
@@ -207,6 +211,7 @@ export function TradePanel({ trade }: TradePanelProps) {
               type="text"
               inputMode="decimal"
               placeholder="0.00"
+              value={trade.triggerPrice}
               className="pe-12 font-mono text-sm"
               onChange={(e) => {
                 const value = e.target.value

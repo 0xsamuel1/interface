@@ -58,7 +58,7 @@ export const ENV: Env = {
 
   PYTH_HERMES_URL: optionalEnv(
     import.meta.env.VITE_PYTH_HERMES_URL,
-    "https://hermes.pyth.network",
+    "/api/pyth",
   ),
 
   INDEXER_GRAPHQL_URL: optionalEnv(
