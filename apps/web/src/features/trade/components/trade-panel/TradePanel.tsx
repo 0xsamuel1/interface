@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react"
-import { explorerTxUrl } from "@/app/config/network"
 import {
   Tabs,
   TabsContent,
@@ -27,6 +26,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ApplyReferralCodePrompt } from "./ApplyReferralCodePrompt"
 import { LeverageSlider } from "./LeverageSlider"
 import type { TradeMode, TradeType, useTradeState } from "../../hooks/useTradeState"
+import { explorerTxUrl } from "@/app/config/network"
 import { NumberInput } from "@/shared/components/NumberInput"
 import { useWalletStore } from "@/features/wallet/store/wallet-store"
 import { TokenIcon } from "@/shared/components/TokenIcon"

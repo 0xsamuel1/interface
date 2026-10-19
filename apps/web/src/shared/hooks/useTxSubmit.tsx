@@ -1,8 +1,8 @@
-import { useCallback, useState, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { toast } from "@workspace/ui/components/toast"
+import { useTxFeedback } from "./useTxFeedback"
 import { sendAndPoll } from "@/lib/tx-builder"
 import { explorerTxUrl } from "@/app/config/network"
-import { useTxFeedback } from "./useTxFeedback"
 import { haptic } from "@/shared/lib/haptics"
 
 export type SubmitTxOptions = {
@@ -84,14 +84,14 @@ export function useTxSubmit() {
     error: null,
   })
   const feedback = useTxFeedback()
-  // #733: Track attempt identity to detect and prevent duplicate submissions
+  // Issue 733: Track attempt identity to detect and prevent duplicate submissions
   const attemptIdRef = useRef<string | null>(null)
-  // #733: Guard against double-click, Enter+click, component rerender triggering multiple submissions
+  // Issue 733: Guard against double-click, Enter+click, component rerender triggering multiple submissions
   const submitInProgressRef = useRef(false)
 
   const submit = useCallback(
     async (getSignedXdr: () => Promise<string>, options: SubmitTxOptions): Promise<string> => {
-      // #733: Prevent duplicate submission (double-click, accidental Enter+click, rerender)
+      // Issue 733: Prevent duplicate submission (double-click, accidental Enter+click, rerender)
       if (submitInProgressRef.current) {
         throw new Error("Submission already in progress")
       }
@@ -116,15 +116,15 @@ export function useTxSubmit() {
     [],
   )
 
-  // #732: Extended submit that integrates with transaction feedback controller
+  // Issue 732: Extended submit that integrates with transaction feedback controller
   const submitWithFeedback = useCallback(
     async (getSignedXdr: () => Promise<string>, options: SubmitTxOptions): Promise<string> => {
       const attemptId = `txn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
       attemptIdRef.current = attemptId
 
-      const attempt = feedback.createAttempt(attemptId)
+      feedback.createAttempt(attemptId)
 
-      // #733: Prevent duplicate submission with attempt tracking
+      // Issue 733: Prevent duplicate submission with attempt tracking
       if (submitInProgressRef.current) {
         feedback.handleEvent({
           type: "error",
@@ -147,7 +147,7 @@ export function useTxSubmit() {
                 const response = await sendAndPoll(signedXdr)
                 return response.hash
               } catch (submitError) {
-                // #733: Unknown submission outcome — signal for status lookup
+                // Issue 733: Unknown submission outcome — signal for status lookup
                 const errorMsg = submitError instanceof Error ? submitError.message : "Submission failed"
                 if (errorMsg.includes("unknown")) {
                   feedback.handleEvent({ type: "unknown_outcome" })
@@ -186,7 +186,7 @@ export function useTxSubmit() {
         submitInProgressRef.current = false
         throw error
       } finally {
-        // #733: Keep attempt ID for status lookup in case of unknown outcomes
+        // Issue 733: Keep attempt ID for status lookup in case of unknown outcomes
         // Do NOT clear immediately — let status lookup use it if needed
       }
     },
@@ -195,7 +195,7 @@ export function useTxSubmit() {
 
   return {
     submit,
-    // #732 & #733: Extended submit with transaction feedback controller
+    // Issues 732 and 733: Extended submit with transaction feedback controller
     submitWithFeedback,
     isLoading: state.isLoading,
     txHash: state.txHash,
