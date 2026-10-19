@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { GLV_VAULTS, GM_POOLS } from "../data/pools"
 import { useRewardsAccrued, useStakingInfo } from "../queries"
 import { fromSorobanAmount } from "@/shared/lib/bignum"
+import { queryKeys } from "@/shared/lib/query-keys"
 
 export type EarnStats = {
   totalInvestmentUsd: number
@@ -58,8 +59,8 @@ export function useEarnStats() {
 
 export function useUserGmPositions() {
   return useQuery<Array<UserGmPosition>>({
-    queryKey: ["earn", "gm-positions"],
-    queryFn: async (): Promise<Array<UserGmPosition>> => {
+    queryKey: queryKeys.earn.gmPositions(),
+    queryFn: (): Array<UserGmPosition> => {
       return []
     },
     staleTime: 20_000,
@@ -69,8 +70,8 @@ export function useUserGmPositions() {
 
 export function useUserGlvPositions() {
   return useQuery<Array<UserGlvPosition>>({
-    queryKey: ["earn", "glv-positions"],
-    queryFn: async (): Promise<Array<UserGlvPosition>> => {
+    queryKey: queryKeys.earn.glvPositions(),
+    queryFn: (): Array<UserGlvPosition> => {
       return []
     },
     staleTime: 20_000,

@@ -1,12 +1,15 @@
+import { Card } from "@workspace/ui/components/card"
+import { cn } from "@workspace/ui/lib/utils"
 import type { TimePeriod } from "../../hooks/use-referrals-data"
 import { formatUsd } from "@/shared/lib/format"
 
-
-
 function xAxisLabels(period: TimePeriod): Array<string> {
   const now = new Date()
+  const pad = (value: number) => String(value).padStart(2, "0")
   const fmt = (d: Date) =>
-    `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`
+    period === "24h"
+      ? `${pad(d.getHours())}:${pad(d.getMinutes())}`
+      : `${pad(d.getMonth() + 1)}/${pad(d.getDate())}`
   const msAgo = (ms: number) => new Date(now.getTime() - ms)
   const day = 86_400_000
 
@@ -18,7 +21,9 @@ function xAxisLabels(period: TimePeriod): Array<string> {
     total: 365 * day,
   }
 
-  const total = ranges[period]
+  // Exact 24-hour endpoints share a clock time. Exclude the first minute
+  // so five HH:mm labels are meaningful and distinct without adding a date.
+  const total = period === "24h" ? ranges[period] - 60_000 : ranges[period]
   return Array.from({ length: 5 }, (_, i) => fmt(msAgo(total - (i / 4) * total)))
 }
 
@@ -38,28 +43,30 @@ function InfoIcon({ className }: InfoIconProps) {
   )
 }
 
+type Accent = "green" | "blue"
+
 type Props = {
   title: string
   tooltip: string
   value: number
   period: TimePeriod
-  accent?: "green" | "blue"
+  accent?: Accent
 }
 
 export function StatChartCard({ title, tooltip, value, period, accent = "blue" }: Props) {
   const labels = xAxisLabels(period)
-  const accentColor = accent === "green" ? "#4ade80" : "#60a5fa"
+  const accentStrokeClass = accent === "green" ? "stroke-green-400" : "stroke-blue-400"
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
+    <Card className="overflow-hidden">
       <div className="px-5 pt-4 pb-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-medium text-muted-foreground">{title}</span>
+          <span className="text-11 font-medium text-muted-foreground">{title}</span>
           <span title={tooltip} className="cursor-help text-muted-foreground/50 hover:text-muted-foreground">
             <InfoIcon />
           </span>
         </div>
-        <p className="mt-1.5 text-[22px] font-semibold tabular-nums tracking-tight">
+        <p className="mt-1.5 text-22 font-semibold tabular-nums tracking-tight">
           {formatUsd(value)}
         </p>
       </div>
@@ -105,7 +112,7 @@ export function StatChartCard({ title, tooltip, value, period, accent = "blue" }
             y1={80}
             x2={396}
             y2={80}
-            stroke={accentColor}
+            className={cn(accentStrokeClass)}
             strokeOpacity={0.4}
             strokeWidth={1.5}
             strokeLinecap="round"
@@ -116,7 +123,7 @@ export function StatChartCard({ title, tooltip, value, period, accent = "blue" }
             const x = 28 + (i / (labels.length - 1)) * 368
             return (
               <text
-                key={label}
+                key={i}
                 x={x}
                 y={100}
                 textAnchor="middle"
@@ -130,6 +137,6 @@ export function StatChartCard({ title, tooltip, value, period, accent = "blue" }
           })}
         </svg>
       </div>
-    </div>
+    </Card>
   )
 }

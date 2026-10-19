@@ -1,44 +1,31 @@
-import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
-import { Button } from "@workspace/ui/components/button"
 import { usePositions } from "../../hooks/usePositions"
 import { hasFrozenOrders, useOrders } from "../../hooks/useOrders"
 import { OrderExecutionFrozenBanner } from "./OrderExecutionFrozenBanner"
 import { PositionsList } from "./PositionsList"
 import { OrdersList } from "./OrdersList"
-import { claimFundingFees } from "../../lib/stellar"
-import { useWalletStore } from "@/features/wallet/store/wallet-store"
-import { formatUsd } from "@/shared/lib/format"
+import { OrderHistoryList } from "./OrderHistoryList"
+import { TradeHistoryList } from "./TradeHistoryList"
+import { FundingActivityList } from "./FundingActivityList"
 import type { Position } from "../../hooks/usePositions"
-
-// TODO: Add Trades and Claims tabs once tradeHistory + claimFundingFees are wired up
 
 type Props = {
   onSelectPosition?: (position: Position) => void
+  value?: "positions" | "orders" | "history" | "trades" | "claims"
+  onValueChange?: (value: "positions" | "orders" | "history" | "trades" | "claims") => void
 }
 
-export function BottomTabs({ onSelectPosition }: Props) {
+export function BottomTabs({ onSelectPosition, value, onValueChange }: Props) {
   const { data: positions = [] } = usePositions()
   const { data: orders = [] } = useOrders()
-  const account = useWalletStore((state) => state.address)
-  const [claimingAll, setClaimingAll] = useState(false)
 
-  const claimablePositions = positions.filter((p) => p.fundingFeeDebt > 0)
-  const totalClaimable = claimablePositions.reduce((sum, p) => sum + p.fundingFeeDebt, 0)
-
-  async function handleClaimAll() {
-    if (!account || claimablePositions.length === 0) return
-    setClaimingAll(true)
-    try {
-      const marketAddresses = [...new Set(claimablePositions.map((p) => p.marketAddress))]
-      await claimFundingFees(account, marketAddresses)
-    } finally {
-      setClaimingAll(false)
-    }
-  }
+  // OB-088: The claimable funding fee summary that was in this component has
+  // moved into FundingActivityList, which shows all fee/funding activity with
+  // explicit units, accrual/settlement status, and per-row claim actions.
+  // This keeps BottomTabs lean and delegates fee display to the specialised list.
 
   return (
-    <Tabs defaultValue="positions">
+    <Tabs value={value} defaultValue="positions" onValueChange={(next) => onValueChange?.(next as NonNullable<Props["value"]>)}>
       <OrderExecutionFrozenBanner visible={hasFrozenOrders(orders)} />
       <TabsList className="border-b border-border bg-transparent px-4">
         <TabsTrigger value="positions">
@@ -47,13 +34,15 @@ export function BottomTabs({ onSelectPosition }: Props) {
         <TabsTrigger value="orders">
           Orders {orders.length > 0 && `(${orders.length})`}
         </TabsTrigger>
+        <TabsTrigger value="history">Order history</TabsTrigger>
         <TabsTrigger value="trades">
           Trades
-          {/* TODO: Show count from useTradeHistory once implemented */}
         </TabsTrigger>
         <TabsTrigger value="claims">
-          Claims
-          {/* TODO: Show badge when claimable funding fees > 0 */}
+          {/* OB-088: Label updated to "Funding & Fees" to reflect that this tab
+              now shows the full activity history (accrued, settled, claimed) —
+              not just a snapshot of claimable amounts. */}
+          Funding &amp; Fees
         </TabsTrigger>
       </TabsList>
 
@@ -65,41 +54,20 @@ export function BottomTabs({ onSelectPosition }: Props) {
         <OrdersList />
       </TabsContent>
 
-      <TabsContent value="trades">
-        <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
-          {/* TODO: Implement TradeHistoryList using useTradeHistory (TanStack Query + Soroban events) */}
-          Trade history coming soon
-        </div>
+      <TabsContent value="history">
+        <OrderHistoryList />
       </TabsContent>
 
+      <TabsContent value="trades">
+        <TradeHistoryList />
+      </TabsContent>
+
+      {/* OB-088: Replaced the ad-hoc claimable-positions table with FundingActivityList,
+          which shows all fee/funding activity from the indexer with explicit token units,
+          accrual/settlement status (so it cannot be confused with trading PnL), and
+          per-row claim actions only for settled funding-type rows. */}
       <TabsContent value="claims">
-        {claimablePositions.length > 0 ? (
-          <div className="space-y-2 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Total claimable: {formatUsd(totalClaimable)}</span>
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={claimingAll}
-                onClick={() => void handleClaimAll()}
-              >
-                {claimingAll ? "Claiming..." : "Claim All"}
-              </Button>
-            </div>
-            <div className="space-y-1">
-              {claimablePositions.map((p) => (
-                <div key={p.key} className="flex items-center justify-between rounded border border-border/50 px-3 py-2 text-xs">
-                  <span className="font-medium">{p.marketName}</span>
-                  <span className="text-green-500">{formatUsd(p.fundingFeeDebt)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
-            No claimable funding fees
-          </div>
-        )}
+        <FundingActivityList feeType="funding" />
       </TabsContent>
     </Tabs>
   )

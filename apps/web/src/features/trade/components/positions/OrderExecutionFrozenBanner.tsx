@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { ORDER_EXECUTION_FROZEN_MESSAGE } from "@/lib/soroban/errors"
+import { useEffect, useState } from "react"
+import { ORDER_EXECUTION_FROZEN_MESSAGE } from "@/lib/contracts"
 
 const SESSION_KEY = "so4-order-execution-frozen-dismissed"
 
@@ -8,9 +8,17 @@ type Props = {
 }
 
 export function OrderExecutionFrozenBanner({ visible }: Props) {
-  const [dismissed, setDismissed] = useState(
-    () => sessionStorage.getItem(SESSION_KEY) === "1",
-  )
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        setDismissed(sessionStorage.getItem(SESSION_KEY) === "1")
+      }
+    } catch {
+      // Safari private mode can throw when accessing sessionStorage
+    }
+  }, [])
 
   if (!visible || dismissed) return null
 
@@ -28,7 +36,7 @@ export function OrderExecutionFrozenBanner({ visible }: Props) {
       <button
         type="button"
         onClick={dismiss}
-        className="ml-4 shrink-0 font-medium underline-offset-2 hover:underline"
+        className="ms-4 shrink-0 font-medium underline-offset-2 hover:underline"
         aria-label="Dismiss order execution paused notice"
       >
         Dismiss

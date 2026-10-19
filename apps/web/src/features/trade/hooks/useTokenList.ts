@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query"
-import { Contract, Account, TransactionBuilder, rpc, scValToNative } from "@stellar/stellar-sdk"
+import { Account, Contract, TransactionBuilder, rpc, scValToNative } from "@stellar/stellar-sdk"
 import { TOKENS } from "../data/tokens"
-import type { Token } from "../data/tokens"
 import { sorobanRpc } from "../../../lib/soroban/client"
 import { NETWORK } from "../../../app/config/network"
 import { CONTRACTS } from "../../../app/config/contracts"
+import type { Token } from "../data/tokens"
+import { queryKeys } from "@/shared/lib/query-keys"
 
 const DUMMY_ACCOUNT = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
 
@@ -38,41 +39,41 @@ async function fetchTokensFromChain(): Promise<Array<Token>> {
       throw new Error("DataStore returned invalid or empty token list")
     }
 
-    // 2. Fetch metadata (symbol, decimals, name) for each token on-chain from its SAC contract
+    // 2. Fetch metadata (symbol, decimals, name) for each token — one sim per call
+    //    because simulateTransaction only returns a single result (the last op).
+    async function simCall(tokenContract: Contract, method: string) {
+      const simTx = new TransactionBuilder(dummyAccount, {
+        fee: "100",
+        networkPassphrase: NETWORK.networkPassphrase,
+      })
+        .addOperation(tokenContract.call(method))
+        .setTimeout(10)
+        .build()
+      const sim = await sorobanRpc.simulateTransaction(simTx)
+      if (!rpc.Api.isSimulationSuccess(sim) || !sim.result) {
+        throw new Error(`${method} simulation failed`)
+      }
+      return scValToNative(sim.result.retval)
+    }
+
     const tokens = await Promise.all(
       tokenAddresses.map(async (address: string) => {
         try {
           const tokenContract = new Contract(address)
-          const metaTx = new TransactionBuilder(dummyAccount, {
-            fee: "100",
-            networkPassphrase: NETWORK.networkPassphrase,
-          })
-            .addOperation(tokenContract.call("symbol"))
-            .addOperation(tokenContract.call("decimals"))
-            .addOperation(tokenContract.call("name"))
-            .setTimeout(10)
-            .build()
-
-          const metaSim = await sorobanRpc.simulateTransaction(metaTx)
-
-          if (
-            rpc.Api.isSimulationSuccess(metaSim) &&
-            metaSim.results &&
-            metaSim.results.length >= 3
-          ) {
-            const symbol = String(scValToNative(metaSim.results[0].retval))
-            const decimals = Number(scValToNative(metaSim.results[1].retval))
-            const name = String(scValToNative(metaSim.results[2].retval))
-            const isStable = symbol.toUpperCase().includes("USD") || symbol.toUpperCase() === "EUR"
-
-            return {
-              address,
-              symbol,
-              name,
-              decimals,
-              isStable,
-              priceDecimals: isStable ? 4 : 2,
-            }
+          const [symbol, decimals, name] = await Promise.all([
+            simCall(tokenContract, "symbol"),
+            simCall(tokenContract, "decimals"),
+            simCall(tokenContract, "name"),
+          ])
+          const sym = String(symbol)
+          const isStable = sym.toUpperCase().includes("USD") || sym.toUpperCase() === "EUR"
+          return {
+            address,
+            symbol: sym,
+            name: String(name),
+            decimals: Number(decimals),
+            isStable,
+            priceDecimals: isStable ? 4 : 2,
           }
         } catch (e) {
           console.warn(`Failed to fetch metadata on-chain for token ${address}`, e)
@@ -104,7 +105,7 @@ async function fetchTokensFromChain(): Promise<Array<Token>> {
 
 export function useTokenList() {
   const { data, isLoading, error } = useQuery<Array<Token>>({
-    queryKey: ["tokenList", NETWORK.name],
+    queryKey: queryKeys.trade.tokenList(NETWORK.name),
     queryFn: fetchTokensFromChain,
     staleTime: 600_000, // 10 minutes cache
     gcTime: 1_200_000,

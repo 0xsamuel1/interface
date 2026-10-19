@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { StakingRouterClient } from "@/lib/contracts/staking-router"
+import { stakingRouterClient } from "@/lib/contracts"
 import { useWalletStore } from "@/features/wallet/store/wallet-store"
 import { queryKeys } from "@/shared/lib/query-keys"
 
@@ -11,7 +11,7 @@ export type StakingInfo = {
   pendingWethFees: bigint
 }
 
-const stakingRouter = new StakingRouterClient()
+const stakingRouter = stakingRouterClient
 
 export function useStakingInfo() {
   const { address, status } = useWalletStore()
@@ -22,10 +22,10 @@ export function useStakingInfo() {
       const info = await stakingRouter.getStakerInfo(address!)
 
       return {
-        stakedSO4: info.stakedSO4 ?? info.stakedAmount,
-        stakedEsSO4: info.stakedEsSO4 ?? info.esSO4Balance,
+        stakedSO4: info.stakedSO4,
+        stakedEsSO4: info.stakedEsSO4,
         stakedMultiplierPoints: info.stakedMultiplierPoints,
-        pendingEsSO4Rewards: info.pendingEsSO4Rewards ?? info.accruedRewards,
+        pendingEsSO4Rewards: info.pendingEsSO4Rewards,
         pendingWethFees: info.pendingWethFees,
       }
     },

@@ -8,9 +8,30 @@
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck",
-    "contracts:gen:all": "bun run scripts/generate-bindings.ts"
+    "test": "turbo test && bun test scripts/changelog",
+    "test:coverage": "turbo test:coverage",
+    "test:e2e": "playwright test",
+    "contracts:gen:all": "bun run scripts/generate-bindings.ts",
+    "indexer:codegen": "bun run --cwd apps/s03-indexer codegen",
+    "indexer:build": "bun run --cwd apps/s03-indexer build",
+    "indexer:dev": "bun run --cwd apps/s03-indexer dev",
+    "indexer:start": "bun run --cwd apps/s03-indexer start",
+    "check:integration": "bash scripts/check-integration.sh",
+    "check:tokens": "bun run scripts/check-design-tokens.ts",
+    "check:content": "bun run --cwd apps/docs check:content",
+    "check:links": "bun run --cwd apps/docs check:links",
+    "generate:design-tokens": "bun run scripts/generate-design-tokens.ts",
+    "check:design-tokens:generated": "bun run scripts/generate-design-tokens.ts --check",
+    "generate:errors": "bun run scripts/generate-errors-reference.ts",
+    "check:errors:generated": "bun run scripts/generate-errors-reference.ts --check",
+    "changelog:validate": "bun run scripts/changelog/validate.ts",
+    "changelog:release": "bun run scripts/changelog/release.ts",
+    "changelog:build": "bun run scripts/changelog/build.ts",
+    "changelog:verify-tag": "bun run scripts/changelog/verify-tag.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "jsdom": "^29.1.1",
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "turbo": "^2.8.17",
@@ -23,5 +44,20 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "overrides": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@simple-git/argv-parser": "2.0.1",
+    "axios": "1.20.0",
+    "basic-ftp": "6.2.3",
+    "got": "11.8.6",
+    "parse-duration": "2.1.9",
+    "protobufjs": "7.6.6",
+    "qs": "6.16.1",
+    "simple-git": "4.0.2",
+    "tmp": "0.2.7",
+    "toml": "4.3.0",
+    "uuid": "11.1.1",
+    "ws": "8.22.0"
+  }
 }

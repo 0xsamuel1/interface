@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
+import type { VestingSchedule } from "@/lib/contracts"
+import { getVestingRouterClient } from "@/lib/contracts"
 import { useWalletStore } from "@/features/wallet/store/wallet-store"
-import { VestingRouterClient, type VestingSchedule } from "@/lib/contracts/vesting-router"
 import { queryKeys } from "@/shared/lib/query-keys"
 
 /**
@@ -14,7 +15,7 @@ export function useVestingSchedule() {
   return useQuery<VestingSchedule>({
     queryKey: queryKeys.earn.vestingSchedule(address ?? ""),
     queryFn: async (): Promise<VestingSchedule> => {
-      const client = new VestingRouterClient()
+      const client = getVestingRouterClient()
       return client.getVestingSchedule(address as string)
     },
     enabled: !!address,

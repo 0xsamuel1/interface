@@ -1,8 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { StellarWalletsKit } from "@creit.tech/stellar-wallets-kit/sdk"
-import { FREIGHTER_ID } from "@creit.tech/stellar-wallets-kit/modules/freighter"
-import { HANA_ID } from "@creit.tech/stellar-wallets-kit/modules/hana"
-import { XBULL_ID } from "@creit.tech/stellar-wallets-kit/modules/xbull"
 
 import { QRCodeSVG } from "qrcode.react"
 
@@ -17,11 +13,13 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 
 import { createSep7ConnectUri, createSep7TransactionUri } from "../lib/sep7"
-import { useWalletStore } from "../store/wallet-store"
 import { useBalance } from "../hooks/useBalance"
+import { useWalletStore } from "../store/wallet-store"
+import type { CSSProperties, ComponentProps } from "react"
+import { useKeyboardShortcut } from "@/shared/hooks/useKeyboardShortcut"
 import { useWallet } from "@/app/providers"
 import { NETWORK } from "@/app/config/network"
-import type { ComponentProps } from "react"
+import { SITE_URL } from "@/shared/lib/site-identity"
 
 type ConnectButtonProps = Omit<
   ComponentProps<typeof Button>,
@@ -33,6 +31,10 @@ type WalletOption = {
   name: string
   installUrl: string
 }
+
+const FREIGHTER_ID = "freighter"
+const HANA_ID = "hana"
+const XBULL_ID = "xbull"
 
 const WALLET_OPTIONS: Array<WalletOption> = [
   {
@@ -53,14 +55,71 @@ const WALLET_OPTIONS: Array<WalletOption> = [
   },
 ]
 
+async function getWalletsKit() {
+  const { StellarWalletsKit } = await import("@creit.tech/stellar-wallets-kit/sdk")
+  return StellarWalletsKit
+}
+
 export function ConnectButton({ className, ...props }: ConnectButtonProps) {
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
   const address = useWalletStore((state) => state.address)
   const status = useWalletStore((state) => state.status)
   const isConnecting = status === "connecting"
+  // Issue 887: only the transition into `connected` should play the pill entrance,
+  // not every render of an already-connected wallet.
+  const wasConnecting = useRef(false)
+
+  useEffect(() => {
+    if (status === "connecting") {
+      wasConnecting.current = true
+    } else if (status !== "connected") {
+      wasConnecting.current = false
+    }
+  }, [status])
+
+  const justConnected = status === "connected" && wasConnecting.current
+
+  // Must be called unconditionally — before any early return
+  useKeyboardShortcut({
+    key: "k",
+    onKeyPress: () => setIsWalletModalOpen(true),
+    enabled: !isConnecting && status !== "connected",
+  })
 
   if (status === "connected" && address) {
-    return <AccountBadge address={address} className={className as string | undefined} {...props} />
+    return (
+      <AccountBadge
+        address={address}
+        animateIn={justConnected}
+        className={className as string | undefined}
+        {...props}
+      />
+    )
+  }
+
+  // Issue 887: while the kit handshake is in flight the trigger becomes an
+  // aria-busy status with a single pulsing indicator, so the click has
+  // immediate feedback that never shifts the surrounding layout.
+  if (isConnecting) {
+    return (
+      <Button
+        {...props}
+        type="button"
+        aria-label="Connecting wallet"
+        aria-busy="true"
+        className={cn("w-full justify-center gap-2 sm:w-auto", className)}
+        disabled
+      >
+        <span
+          className="relative inline-flex size-3.5 items-center justify-center"
+          aria-hidden="true"
+        >
+          <span className="so4-wallet-pulse absolute inset-0 rounded-full bg-primary/20" />
+          <WalletIcon className="relative size-3.5" />
+        </span>
+        <span role="status">Connecting</span>
+      </Button>
+    )
   }
 
   return (
@@ -68,13 +127,11 @@ export function ConnectButton({ className, ...props }: ConnectButtonProps) {
       <Button
         {...props}
         type="button"
-        aria-label={isConnecting ? "Connecting wallet" : "Connect wallet"}
-        aria-busy={isConnecting}
+        aria-label="Connect wallet"
         className={cn("w-full sm:w-auto", className)}
-        disabled={isConnecting || props.disabled}
+        disabled={props.disabled}
         onClick={() => setIsWalletModalOpen(true)}
       >
-        {isConnecting && <Spinner />}
         Connect Wallet
       </Button>
 
@@ -83,13 +140,34 @@ export function ConnectButton({ className, ...props }: ConnectButtonProps) {
   )
 }
 
+function WalletIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 16.5v-9Z" />
+      <path d="M4 8h13" />
+      <path d="M16 12h4v4h-4a2 2 0 0 1 0-4Z" />
+    </svg>
+  )
+}
+
 function AccountBadge({
   address,
   className,
+  animateIn = false,
   ...props
 }: {
   address: string
   className?: string
+  animateIn?: boolean
 } & Omit<ConnectButtonProps, "className">) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -109,7 +187,11 @@ function AccountBadge({
   }, [open])
 
   return (
-    <div ref={ref} className="relative">
+    <div
+      ref={ref}
+      data-wallet-state="connected"
+      className={cn("relative", animateIn && "so4-wallet-pill")}
+    >
       <Button
         {...props}
         type="button"
@@ -124,7 +206,7 @@ function AccountBadge({
       </Button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-md border bg-popover p-3 shadow-md">
+        <div className="absolute inset-inline-end-0 top-full z-50 mt-1 w-72 rounded-md border bg-popover p-3 shadow-md">
           <p className="text-xs text-muted-foreground">Connected</p>
           <p className="mt-1 truncate font-mono text-sm" title={address}>
             {address}
@@ -140,7 +222,7 @@ function AccountBadge({
           <div className="mt-2 space-y-0.5">
             <button
               type="button"
-              className="w-full rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+              className="w-full rounded px-2 py-1.5 text-start text-sm transition-colors hover:bg-accent"
               onClick={() => {
                 navigator.clipboard.writeText(address)
                 setOpen(false)
@@ -154,7 +236,7 @@ function AccountBadge({
                 href="https://friendbot.stellar.org"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block w-full rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+                className="block w-full rounded px-2 py-1.5 text-start text-sm transition-colors hover:bg-accent"
               >
                 Testnet Faucet
               </a>
@@ -162,7 +244,7 @@ function AccountBadge({
 
             <button
               type="button"
-              className="w-full rounded px-2 py-1.5 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
+              className="w-full rounded px-2 py-1.5 text-start text-sm text-destructive transition-colors hover:bg-destructive/10"
               onClick={() => {
                 disconnect()
                 setOpen(false)
@@ -200,7 +282,8 @@ function WalletModal({
 
     let cancelled = false
 
-    StellarWalletsKit.refreshSupportedWallets()
+    getWalletsKit()
+      .then((kit) => kit.refreshSupportedWallets())
       .then((wallets) => {
         if (cancelled) return
 
@@ -240,8 +323,9 @@ function WalletModal({
     setStatus("connecting")
 
     try {
-      StellarWalletsKit.setWallet(wallet.id)
-      const { address } = await StellarWalletsKit.fetchAddress()
+      const kit = await getWalletsKit()
+      kit.setWallet(wallet.id)
+      const { address } = await kit.fetchAddress()
       setConnected(address, wallet.id)
       onOpenChange(false)
     } catch {
@@ -263,7 +347,7 @@ function WalletModal({
   )
   const sep7Uri = useMemo(() => {
     const origin =
-      typeof window === "undefined" ? "https://so4.markets" : window.location.origin
+      typeof window === "undefined" ? SITE_URL : window.location.origin
     const callbackUrl = new URL("/", origin).toString()
 
     if (pendingTransactionXdr) {
@@ -287,7 +371,7 @@ function WalletModal({
         </DialogHeader>
 
         <div className="space-y-2">
-          {sortedWalletOptions.map((wallet) => {
+          {sortedWalletOptions.map((wallet, index) => {
             const isAvailable = availableWalletIds.has(wallet.id)
 
             return (
@@ -295,7 +379,8 @@ function WalletModal({
                 key={wallet.id}
                 type="button"
                 variant={isAvailable ? "default" : "outline"}
-                className="w-full justify-between"
+                className="so4-wallet-row w-full justify-between"
+                style={{ "--wallet-stagger": index } as CSSProperties}
                 onClick={() => {
                   void connectWallet(wallet)
                 }}
@@ -352,37 +437,12 @@ function WalletModal({
             </a>
           </div>
 
-          <div className="flex justify-center rounded-md bg-white p-4">
+          <div className="flex justify-center rounded-md bg-popover p-4">
             <QRCodeSVG value={sep7Uri} size={168} level="M" />
           </div>
         </div>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function Spinner() {
-  return (
-    <svg
-      className="size-3.5 animate-spin"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
-      <circle
-        className="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
-      <path
-        className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z"
-      />
-    </svg>
   )
 }
 

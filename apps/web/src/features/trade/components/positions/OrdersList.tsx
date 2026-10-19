@@ -1,29 +1,52 @@
-import { Skeleton } from "@workspace/ui/components/skeleton"
-import { Button } from "@workspace/ui/components/button"
-import { Badge } from "@workspace/ui/components/badge"
 import { useState } from "react"
-import { useOrders, type Order } from "../../hooks/useOrders"
-import { cancelOrder } from "../../lib/stellar"
-import { formatUsd } from "../../lib/trade-math"
-import { OrderCancelDialog } from "./OrderCancelDialog"
-import type { OrderKey } from "@/lib/contracts/generated/exchange-router/src"
+import { useAnimatedRows } from "@workspace/ui/hooks/use-animated-rows"
+import { Button } from "@workspace/ui/components/button"
+import { DataTable } from "@workspace/ui/components/data-table"
+import { StatusBadge } from "@workspace/ui/components/status-badge"
+import { Numeric } from "@workspace/ui/components/numeric"
+import { useOrdersWithIndexer } from "../../hooks/useOrdersWithIndexer"
+import { amendOrderViaReplace, cancelOrder } from "../../lib/stellar"
+import {   getOrderAmendCapability } from "../../lib/order-amendment"
+import { AmendOrderDialog  } from "./AmendOrderDialog"
+import { AccountOrderCard } from "./AccountRowDetails"
+import type {AmendPayload, AmendReplaceOutcome} from "../../lib/order-amendment";
+import type {AmendTarget} from "./AmendOrderDialog";
+import type { OrderLifecycleStage } from "../../lib/order-lifecycle"
+import type { Column } from "@workspace/ui/components/data-table"
+import type { OrderWithIndexer } from "../../hooks/useOrdersWithIndexer"
+import type { OrderKey } from "@/lib/contracts"
 
-function toOrderKey(order: Order): OrderKey {
+function toOrderKey(order: OrderWithIndexer): OrderKey {
+  return order.key
+}
+
+function toLifecycleStage(order: OrderWithIndexer): OrderLifecycleStage {
+  if (order.awaitingIndex) return "pending"
+  if (order.status === "frozen") return "frozen"
+  return "accepted"
+}
+
+function toAmendTarget(order: OrderWithIndexer): AmendTarget {
   return {
+    orderKey: order.key,
+    marketName: order.marketName,
     orderType: order.orderType,
-    account: order.account,
-    market: order.marketAddress,
-    index: 0n,
+    isLong: order.isLong,
+    triggerPrice: order.triggerPrice,
+    remainingSizeUsd: order.sizeUsd,
+    filledSizeUsd: 0,
+    stage: toLifecycleStage(order),
+    awaitingIndex: order.awaitingIndex,
   }
 }
 
 export function OrdersList() {
-  const { data: orders = [], isLoading } = useOrders()
+  const { data: orders = [], isLoading, isDisabled } = useOrdersWithIndexer()
   const [cancelling, setCancelling] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [amending, setAmending] = useState<OrderWithIndexer | null>(null)
+  const [amendError, setAmendError] = useState<string | null>(null)
 
-  async function handleCancel(order: Order) {
+  async function handleCancel(order: OrderWithIndexer) {
     setCancelling(order.key)
     try {
       await cancelOrder(order.account, toOrderKey(order))
@@ -33,89 +56,239 @@ export function OrdersList() {
     }
   }
 
-  function openCancelDialog(order: Order) {
-    setSelectedOrder(order)
-    setDialogOpen(true)
+  async function handleAmend(payload: AmendPayload): Promise<AmendReplaceOutcome> {
+    if (!amending) throw new Error("No order selected for amendment.")
+    const target = amending
+    setAmendError(null)
+    const outcome = await amendOrderViaReplace(
+      target.account,
+      {
+        orderKey: target.key,
+        marketAddress: target.marketAddress,
+        collateralToken: target.collateralToken,
+        orderType: target.orderType,
+        isLong: target.isLong,
+        acceptablePrice: target.acceptablePrice,
+        triggerPrice: target.triggerPrice,
+        positionKey: target.positionKey,
+        remainingSizeUsd: target.sizeUsd,
+        filledSizeUsd: 0,
+        stage: toLifecycleStage(target),
+        awaitingIndex: target.awaitingIndex,
+      },
+      payload,
+    )
+    if (outcome.status === "replace-failed") {
+      // Original is gone: close the dialog and surface the terminal state in
+      // the table banner — never render the cancelled row as live.
+      setAmending(null)
+      setAmendError(
+        `Order cancelled, but the replacement failed: ${outcome.error}. Place a new order manually.`,
+      )
+    }
+    return outcome
   }
 
-  if (isLoading) {
-    return (
-      <div className="space-y-2 p-4">
-        <Skeleton className="h-10 w-full" />
-      </div>
-    )
-  }
+  const columns: Array<Column<OrderWithIndexer>> = [
+    {
+      id: "market",
+      header: "Market",
+      accessor: (o) => (
+        <div className="flex items-center gap-1.5">
+          <span className="font-medium">{o.marketName}</span>
+          <StatusBadge variant={o.isLong ? "success" : "danger"}>
+            {o.isLong ? "Long" : "Short"}
+          </StatusBadge>
+          <StatusBadge variant={o.status === "frozen" ? "warning" : "neutral"}>
+            {cancelling === o.key ? "Cancelling" : o.awaitingIndex ? "Pending index" : o.status === "frozen" ? "Frozen" : "Open"}
+          </StatusBadge>
+        </div>
+      ),
+    },
+    {
+      id: "type",
+      header: "Type",
+      accessor: (o) => <span className="text-muted-foreground">{o.orderType}</span>,
+    },
+    {
+      id: "size",
+      header: "Original / remaining",
+      accessor: (o) => (
+        <div className="tabular-nums">
+          <Numeric value={o.sizeUsd} format="usd" />
+          <span className="text-muted-foreground"> / </span>
+          <Numeric value={o.sizeUsd} format="usd" />
+        </div>
+      ),
+    },
+    {
+      id: "trigger",
+      header: "Trigger",
+      accessor: (o) => o.limitOrTrigger === "market" ? (
+        <span className="text-muted-foreground">Market</span>
+      ) : (
+        <div>
+          <span className="text-muted-foreground">{o.limitOrTrigger === "limit" ? "Limit" : "Trigger"}: </span>
+          <Numeric value={o.triggerPrice} format="usd" />
+        </div>
+      ),
+    },
+    {
+      id: "created",
+      header: "Created",
+      accessor: (o) => (
+        <span className="text-muted-foreground">
+          {new Date(o.updatedAt).toLocaleTimeString()}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      accessor: (o) => {
+        const capability = getOrderAmendCapability({
+          orderType: o.orderType,
+          stage: toLifecycleStage(o),
+          awaitingIndex: o.awaitingIndex,
+        })
+        return (
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={!capability.canAmend || o.awaitingIndex}
+              title={capability.canAmend ? "Amend via cancel-and-replace (loses queue priority)" : (capability.reason ?? "Cannot amend")}
+              aria-label={capability.canAmend ? `Amend ${o.marketName} order` : `Amend unavailable: ${capability.reason ?? "unsupported"}`}
+              onClick={() => {
+                setAmendError(null)
+                setAmending(o)
+              }}
+            >
+              Edit
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={o.awaitingIndex || cancelling === o.key}
+              onClick={() => void handleCancel(o)}
+            >
+              {cancelling === o.key ? "…" : "Cancel"}
+            </Button>
+          </div>
+        )
+      },
+    },
+  ]
 
-  if (orders.length === 0) {
-    return (
-      <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
-        No open orders
-      </div>
-    )
-  }
+  const attachMobileOrder = useAnimatedRows(orders, (order) => order.clientOrderId, true, isLoading)
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-border text-left text-muted-foreground">
-            <th className="px-4 py-2">Market</th>
-            <th className="px-4 py-2">Type</th>
-            <th className="px-4 py-2">Size</th>
-            <th className="px-4 py-2">Trigger</th>
-            <th className="px-4 py-2">Created</th>
-            <th className="px-4 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          {orders.map((o) => (
-            <tr key={o.key} className="border-b border-border/50">
-              <td className="px-4 py-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-medium">{o.marketName}</span>
-                  <Badge
-                    variant="secondary"
-                    className={
-                      o.isLong ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
-                    }
-                  >
-                    {o.isLong ? "Long" : "Short"}
-                  </Badge>
-                  {o.status === "frozen" && (
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
-                      Frozen
-                    </Badge>
-                  )}
-                </div>
-              </td>
-              <td className="px-4 py-2 text-muted-foreground">{o.orderType}</td>
-              <td className="px-4 py-2 font-mono">{formatUsd(o.sizeUsd)}</td>
-              <td className="px-4 py-2 font-mono">{formatUsd(o.triggerPrice)}</td>
-              <td className="px-4 py-2 text-muted-foreground">
-                {new Date(o.createdAt).toLocaleTimeString()}
-              </td>
-              <td className="px-4 py-2">
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={cancelling === o.key}
-                  onClick={() => openCancelDialog(o)}
-                >
-                  {cancelling === o.key ? "…" : "Cancel"}
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <OrderCancelDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        order={selectedOrder}
-        isSubmitting={cancelling === selectedOrder?.key}
-        onConfirm={() => selectedOrder && void handleCancel(selectedOrder)}
+    <>
+      {isDisabled && (
+        <div className="px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-500">
+          ⚠️ Indexer disabled - Order history unavailable. Showing live contract data only.
+        </div>
+      )}
+      {amendError && (
+        <p role="alert" className="border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+          {amendError}
+        </p>
+      )}
+      <div className="hidden md:block">
+        <DataTable
+          columns={columns}
+          data={orders}
+          animateRows
+          isLoading={isLoading}
+          emptyMessage={isDisabled ? "Indexer disabled - showing contract-only data" : "No open orders"}
+          keyExtractor={(o) => o.clientOrderId}
+        />
+      </div>
+      {/* Narrow-screen cards mirror the table with identical labels and actions (OB-090). */}
+      <div className="space-y-2 p-3 md:hidden" role="list" aria-label="Open orders">
+        {isLoading ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Loading orders…</p>
+        ) : orders.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            {isDisabled ? "Indexer disabled - showing contract-only data" : "No open orders"}
+          </p>
+        ) : (
+          orders.map((o) => {
+            const capability = getOrderAmendCapability({
+              orderType: o.orderType,
+              stage: toLifecycleStage(o),
+              awaitingIndex: o.awaitingIndex,
+            })
+            const statusLabel =
+              cancelling === o.key ? "Cancelling" : o.awaitingIndex ? "Pending index" : o.status === "frozen" ? "Frozen" : "Open"
+            return (
+              <div key={o.clientOrderId} ref={(node) => attachMobileOrder(o.clientOrderId, node)} role="listitem">
+                <AccountOrderCard
+                  rowKey={o.clientOrderId}
+                  marketName={o.marketName}
+                  sideBadge={{ label: o.isLong ? "Long" : "Short", variant: o.isLong ? "success" : "danger" }}
+                  statusBadge={{ label: statusLabel, variant: o.status === "frozen" ? "warning" : "neutral" }}
+                  summarySizeUsd={o.sizeUsd}
+                  fields={[
+                    { label: "Type", value: <span className="text-muted-foreground">{o.orderType}</span> },
+                    {
+                      label: "Original / remaining",
+                      value: (
+                        <span className="tabular-nums">
+                          <Numeric value={o.sizeUsd} format="usd" />
+                          <span className="text-muted-foreground"> / </span>
+                          <Numeric value={o.sizeUsd} format="usd" />
+                        </span>
+                      ),
+                    },
+                    {
+                      label: "Trigger",
+                      value:
+                        o.limitOrTrigger === "market" ? (
+                          <span className="text-muted-foreground">Market</span>
+                        ) : (
+                          <span>
+                            <span className="text-muted-foreground">
+                              {o.limitOrTrigger === "limit" ? "Limit" : "Trigger"}:{" "}
+                            </span>
+                            <Numeric value={o.triggerPrice} format="usd" />
+                          </span>
+                        ),
+                    },
+                    {
+                      label: "Created",
+                      value: <span className="text-muted-foreground">{new Date(o.updatedAt).toLocaleTimeString()}</span>,
+                    },
+                  ]}
+                  actions={[
+                    {
+                      label: "Edit",
+                      disabled: !capability.canAmend || o.awaitingIndex,
+                      disabledReason: capability.canAmend ? "Unavailable while pending" : (capability.reason ?? "Unsupported"),
+                      onClick: () => {
+                        setAmendError(null)
+                        setAmending(o)
+                      },
+                    },
+                    {
+                      label: "Cancel",
+                      disabled: o.awaitingIndex,
+                      pending: cancelling === o.key,
+                      onClick: () => void handleCancel(o),
+                    },
+                  ]}
+                />
+              </div>
+            )
+          })
+        )}
+      </div>
+      <AmendOrderDialog
+        order={amending ? toAmendTarget(amending) : null}
+        open={amending !== null}
+        onClose={() => setAmending(null)}
+        onSubmit={handleAmend}
       />
-    </div>
+    </>
   )
 }

@@ -1,107 +1,112 @@
 import { useQuery } from "@tanstack/react-query"
-import { queryKeys } from "../lib/query-keys"
+import { activeQueryNetwork, queryKeys } from "../lib/query-keys"
 import { MARKETS } from "../data/markets"
+import { useTokenPrices } from "./useTokenPrices"
+import type { PositionInfo } from "@/lib/contracts"
+import { syntheticsReaderClient } from "@/lib/contracts"
 import { useWalletStore } from "@/features/wallet/store/wallet-store"
-import { SyntheticsReaderClient } from "@/lib/contracts/synthetics-reader"
 import { fromSorobanAmount } from "@/shared/lib/bignum"
-import { getToken } from "../data/tokens"
+import { queryPolicy } from "@/shared/lib/query-policies"
 
 export type Position = {
-  key: string                   // unique: account + market + collateral + isLong
+  key: string
   account: string
   marketAddress: string
-  marketName: string            // e.g. "BTC/USD"
+  marketName: string
   indexToken: string
   collateralToken: string
-  collateralAmount: number      // in token units
+  collateralAmount: number
   collateralUsd: number
   sizeUsd: number
+  sizeInUsdRaw: bigint
   entryPrice: number
   markPrice: number
   liquidationPrice: number
   leverage: number
-  pnl: number                   // unrealized PnL in USD
+  pnl: number
   pnlPercent: number
   isLong: boolean
   pnlAfterFees: number
-  fundingFeeDebt: number
+  fundingFeeUsd: number
 }
 
-const CHAIN_ID = "stellar-mainnet"
+const CHAIN_ID = activeQueryNetwork()
 const USD_DECIMALS = 30
+const TOKEN_DECIMALS = 7
 
-async function fetchPositions(account: string): Promise<Array<Position>> {
-  if (!account) return []
+async function fetchPositions(
+  account: string,
+  getMidPrice: (addressOrSymbol: string) => number,
+): Promise<Array<Position>> {
+  const rawPositions = await syntheticsReaderClient.getAccountPositions(account)
 
-  const client = new SyntheticsReaderClient()
+  return rawPositions
+    .filter((p: PositionInfo) => p.position.sizeInUsd > 0n)
+    .map((p: PositionInfo): Position => {
+      const props = p.position
+      const market = MARKETS.find((m) => m.address === props.market)
 
-  const positions = await Promise.all(
-    MARKETS.flatMap(async (market) => {
-      return Promise.all(
-        [true, false].map(async (isLong) => {
-          try {
-            const info = await client.getPositionInfo(account, market.address, isLong)
-            if (!info || info.sizeUsd === 0n) return null
+      const collateralAmount = fromSorobanAmount(props.collateralAmount, TOKEN_DECIMALS)
+      const sizeUsd          = fromSorobanAmount(props.sizeInUsd,        USD_DECIMALS)
 
-            const collateralTokenSymbol = isLong ? market.longTokenAddress : market.shortTokenAddress
-            const tokenMeta = getToken(collateralTokenSymbol)
-            const decimals = tokenMeta?.decimals ?? 7
+      // entry price: size_usd / size_in_tokens (both on same token decimal scale)
+      const sizeInTokens = fromSorobanAmount(props.sizeInTokens, TOKEN_DECIMALS)
+      const entryPrice   = sizeInTokens > 0 ? sizeUsd / sizeInTokens : 0
 
-            const collateralAmount = fromSorobanAmount(info.collateralAmount, decimals)
-            const collateralUsd = fromSorobanAmount(info.collateralUsd, USD_DECIMALS)
-            const sizeUsd = fromSorobanAmount(info.sizeUsd, USD_DECIMALS)
-            const entryPrice = fromSorobanAmount(info.entryPrice, USD_DECIMALS)
-            const markPrice = fromSorobanAmount(info.markPrice, USD_DECIMALS)
-            const liquidationPrice = fromSorobanAmount(info.liquidationPrice, USD_DECIMALS)
-            const pnl = fromSorobanAmount(info.pnl, USD_DECIMALS)
-            const fundingFeeDebt = fromSorobanAmount(info.fundingFeeDebt, USD_DECIMALS)
-            
-            const pnlAfterFees = pnl - fundingFeeDebt
-            const pnlPercent = collateralUsd > 0 ? (pnlAfterFees / collateralUsd) * 100 : 0
-            const leverage = info.leverage
+      const pnlUsd           = fromSorobanAmount(p.pnlUsd,           USD_DECIMALS)
+      const fundingFeeUsd    = fromSorobanAmount(p.fundingFeeUsd,     USD_DECIMALS)
+      const liquidationPrice = fromSorobanAmount(p.liquidationPrice,  USD_DECIMALS)
 
-            return {
-              key: `${account}-${market.address}-${isLong ? "long" : "short"}`,
-              account,
-              marketAddress: market.address,
-              marketName: market.name,
-              indexToken: market.indexTokenAddress,
-              collateralToken: collateralTokenSymbol,
-              collateralAmount,
-              collateralUsd,
-              sizeUsd,
-              entryPrice,
-              markPrice,
-              liquidationPrice,
-              leverage,
-              pnl,
-              pnlPercent,
-              isLong,
-              pnlAfterFees,
-              fundingFeeDebt,
-            } satisfies Position
-          } catch (e) {
-            console.error(`Failed to fetch position info for market=${market.address} isLong=${isLong}`, e)
-            return null
-          }
-        })
-      )
+      // Collateral USD: multiply token amount by current market price.
+      // getMidPrice falls back to 0 for unknown tokens → collateralUsd = 0.
+      const collateralPrice = getMidPrice(props.collateralToken)
+      const collateralUsd   = collateralPrice > 0
+        ? collateralAmount * collateralPrice
+        : (sizeUsd > 0 && entryPrice > 0 ? sizeUsd * 0.01 : 0) // 100x fallback estimate
+
+      const leverage = collateralUsd > 0 ? Math.round(sizeUsd / collateralUsd) : 0
+
+      const pnlAfterFees = pnlUsd - fundingFeeUsd
+      const pnlPercent   = collateralUsd > 0 ? (pnlAfterFees / collateralUsd) * 100 : 0
+
+      // Mark price: use current oracle price for the index token.
+      // Falls back to entry price if oracle data isn't loaded yet.
+      const indexTokenAddress = market?.indexTokenAddress ?? ""
+      const oracleMarkPrice = getMidPrice(indexTokenAddress)
+      const markPrice = oracleMarkPrice > 0 ? oracleMarkPrice : entryPrice
+
+      return {
+        key: `${props.account}-${props.market}-${props.collateralToken}-${props.isLong}`,
+        account: props.account,
+        marketAddress: props.market,
+        marketName: market?.name ?? props.market,
+        indexToken: indexTokenAddress,
+        collateralToken: props.collateralToken,
+        collateralAmount,
+        collateralUsd,
+        sizeUsd,
+        sizeInUsdRaw: props.sizeInUsd,
+        entryPrice,
+        markPrice,
+        liquidationPrice,
+        leverage,
+        pnl: pnlUsd,
+        pnlPercent,
+        isLong: props.isLong,
+        pnlAfterFees,
+        fundingFeeUsd,
+      }
     })
-  ).then((results) => results.flat().filter((p): p is Position => p !== null))
-
-  return positions
 }
 
 export function usePositions() {
   const account = useWalletStore((state) => state.address)
+  const { getMidPrice } = useTokenPrices()
 
   return useQuery<Array<Position>>({
     queryKey: queryKeys.trade.positions(CHAIN_ID, account ?? ""),
-    queryFn: () => fetchPositions(account!),
+    queryFn: () => fetchPositions(account!, getMidPrice),
     enabled: !!account,
-    staleTime: 10_000,
-    refetchInterval: 5_000,
-    refetchIntervalInBackground: false,
+    ...queryPolicy("positions"),
   })
 }
-

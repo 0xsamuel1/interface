@@ -9,22 +9,25 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { useWalletStore } from "@/features/wallet/store/wallet-store"
-import { useTokenBalances } from "@/features/wallet/hooks/useTokenBalances"
 import { useTokenPrices } from "../../hooks/useTokenPrices"
-import { createIncreaseOrder, createDecreaseOrder } from "../../lib/stellar"
-import { formatUsd } from "@/shared/lib/format"
-import { queryKeys } from "../../lib/query-keys"
+import { useMarketRiskParams } from "../../hooks/useMarketRiskParams"
+import { createDecreaseOrder, createIncreaseOrder } from "../../lib/stellar"
+import { activeQueryNetwork, queryKeys } from "../../lib/query-keys"
+import { getOrderVaultCapability } from "../../lib/order-vault-capability"
 import type { Position } from "../../hooks/usePositions"
+import { formatUsd } from "@/shared/lib/format"
+import { useTokenBalances } from "@/features/wallet/hooks/useTokenBalances"
+import { useWalletStore } from "@/features/wallet/store/wallet-store"
 
 type Props = {
   position: Position | null
   mode: "add" | "remove" | null
   open: boolean
   onClose: () => void
+  onSubmit?: (amount: number) => Promise<string | null>
 }
 
-export function CollateralDialog({ position, mode, open, onClose }: Props) {
+export function CollateralDialog({ position, mode, open, onClose, onSubmit }: Props) {
   const [amount, setAmount] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -32,7 +35,15 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
   const account = useWalletStore((state) => state.address)
   const { data: balances } = useTokenBalances()
   const { getMidPrice } = useTokenPrices()
+  const marketRisk = useMarketRiskParams(position?.marketAddress ?? "")
   const queryClient = useQueryClient()
+
+  // OB-089: Check whether the OrderVault is a real deployed contract.
+  // Deposit (add collateral) goes through the vault; withdrawal (remove
+  // collateral) creates a DecreaseOrder and does not touch the vault directly.
+  // Only block "add" mode — "remove" is still backed by an executable path.
+  const vaultCapability = getOrderVaultCapability()
+  const isDepositBlocked = mode === "add" && !vaultCapability.isDeployed
 
   // Reset inputs when opened/closed/changed
   useEffect(() => {
@@ -54,7 +65,7 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
   let newCollateralUsd = position.collateralUsd
   if (mode === "add") {
     newCollateralUsd = position.collateralUsd + deltaUsd
-  } else if (mode === "remove") {
+  } else {
     newCollateralUsd = Math.max(0, position.collateralUsd - deltaUsd)
   }
 
@@ -62,23 +73,33 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
   const newLeverage = newCollateralUsd > 0 ? position.sizeUsd / newCollateralUsd : 0
 
   // Validate inputs
-  let isValid = amountNum > 0
-  let validationError = ""
+  // OB-089: A stub vault must never produce a successful deposit response.
+  // Setting isValid=false here ensures both the UI button and handleConfirm()
+  // are blocked — defence-in-depth against any path that could reach submit.
+  let isValid = amountNum > 0 && !isDepositBlocked
+  let validationError = isDepositBlocked ? (vaultCapability.unavailableReason ?? "") : ""
 
-  if (amountNum > 0) {
+  if (amountNum > 0 && !isDepositBlocked) {
     if (mode === "add") {
       if (amountNum > walletBalance) {
         isValid = false
         validationError = "Insufficient wallet balance"
       }
-    } else if (mode === "remove") {
+    } else {
       if (amountNum >= position.collateralAmount) {
         isValid = false
         validationError = "Cannot remove all collateral (Close position instead)"
-      } else if (newLeverage > 50) {
+      } else if (marketRisk.state !== "available") {
         isValid = false
-        validationError = "New leverage exceeds maximum allowed (50x)"
+        validationError = "Risk parameters unavailable; try again when the market risk data is fresh"
+      } else if (newLeverage > (marketRisk.params?.maxLeverage ?? 0)) {
+        isValid = false
+        validationError = `New leverage exceeds maximum allowed (${marketRisk.params?.maxLeverage}x)`
       }
+    }
+    if (isValid && marketRisk.state !== "available") {
+      isValid = false
+      validationError = "Risk parameters unavailable; try again when the market risk data is fresh"
     }
   }
 
@@ -88,6 +109,16 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
     setIsSubmitting(true)
     setErrorMsg(null)
     try {
+      if (onSubmit) {
+        const hash = await onSubmit(amountNum)
+        if (hash) onClose()
+        return
+      }
+
+      // 1% slippage buffer so price fluctuation between submit and execution doesn't fail the order
+      const addAcceptable  = pos.isLong ? pos.markPrice * 1.01 : pos.markPrice * 0.99
+      const removeAcceptable = pos.isLong ? pos.markPrice * 0.99 : pos.markPrice * 1.01
+
       if (mode === "add") {
         await createIncreaseOrder({
           account,
@@ -96,7 +127,7 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
           collateralAmount: amountNum,
           sizeDeltaUsd: 0, // collateral-only increase
           isLong: pos.isLong,
-          acceptablePrice: pos.markPrice,
+          acceptablePrice: addAcceptable,
           orderType: "MarketIncrease",
           leverage: Math.round(newLeverage),
         })
@@ -109,7 +140,7 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
           collateralDeltaAmount: amountNum,
           sizeDeltaUsd: 0, // collateral-only decrease
           isLong: pos.isLong,
-          acceptablePrice: pos.markPrice,
+          acceptablePrice: removeAcceptable,
           orderType: "MarketDecrease",
           receiveToken: pos.collateralToken,
         })
@@ -117,7 +148,7 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
       
       // Invalidate queries to refresh list
       await queryClient.invalidateQueries({
-        queryKey: queryKeys.positions("stellar-mainnet", account),
+        queryKey: queryKeys.positions(activeQueryNetwork(), account),
       })
       onClose()
     } catch (e) {
@@ -139,6 +170,17 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-4 py-2 text-sm">
+          {/* OB-089: Inform the user when collateral transfer is unavailable because
+              the OrderVault contract is not deployed on this network. */}
+          {isDepositBlocked && (
+            <p
+              role="alert"
+              aria-live="polite"
+              className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400"
+            >
+              {vaultCapability.unavailableReason}
+            </p>
+          )}
           {/* Market Status details */}
           <div className="rounded-lg bg-muted/30 p-3 space-y-1.5 border border-border/50">
             <div className="flex justify-between">
@@ -184,9 +226,9 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
                 value={amount}
                 disabled={isSubmitting}
                 onChange={(e) => setAmount(e.target.value)}
-                className="pr-16 font-mono text-sm"
+                className="pe-16 font-mono text-sm"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+              <span className="absolute inset-inline-end-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
                 {tokenSymbol}
               </span>
             </div>
@@ -214,6 +256,11 @@ export function CollateralDialog({ position, mode, open, onClose }: Props) {
                 )}
               </div>
             </div>
+            {marketRisk.state !== "available" && (
+              <p role="status" className="text-xs text-muted-foreground">
+                Source risk parameters are unavailable or stale.
+              </p>
+            )}
           </div>
 
           {/* Validation & Error Messages */}
