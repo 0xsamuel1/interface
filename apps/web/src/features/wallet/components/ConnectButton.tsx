@@ -65,7 +65,7 @@ export function ConnectButton({ className, ...props }: ConnectButtonProps) {
   const address = useWalletStore((state) => state.address)
   const status = useWalletStore((state) => state.status)
   const isConnecting = status === "connecting"
-  // #887: only the transition into `connected` should play the pill entrance,
+  // Issue 887: only the transition into `connected` should play the pill entrance,
   // not every render of an already-connected wallet.
   const wasConnecting = useRef(false)
 
@@ -97,7 +97,7 @@ export function ConnectButton({ className, ...props }: ConnectButtonProps) {
     )
   }
 
-  // #887: while the kit handshake is in flight the trigger becomes an
+  // Issue 887: while the kit handshake is in flight the trigger becomes an
   // aria-busy status with a single pulsing indicator, so the click has
   // immediate feedback that never shifts the surrounding layout.
   if (isConnecting) {

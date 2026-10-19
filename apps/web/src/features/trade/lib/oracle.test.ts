@@ -1,7 +1,8 @@
 import { HttpResponse, http } from "msw"
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { server } from "../../../../test/msw/server"
-import { fetchTokenPrices } from "./oracle"
+import { fetchOracleCandles, fetchPythBenchmarkCandles, fetchTokenPrices } from "./oracle"
+import { fetchPythAttestations } from "./pyth"
 
 vi.mock("./pyth", () => ({
   fetchPythAttestations: vi.fn(async (symbols: Array<string>) =>
@@ -121,5 +122,20 @@ describe("Pyth Benchmarks candle fetching & 4xx fallback", () => {
     expect(res.venueName).toBe("Pyth Hermes Reference")
     expect(res.candles).toHaveLength(1)
     expect(res.candles[0]?.close).toBe(80200)
+  })
+})
+
+describe("Pyth authentication fallback (#851)", () => {
+  it("uses Binance source and bid/ask prices after Hermes rejects authentication", async () => {
+    vi.mocked(fetchPythAttestations).mockRejectedValueOnce(new Error("HTTP 401 Unauthorized"))
+    server.use(
+      http.get("https://api.binance.com/api/v3/ticker/bookTicker", () =>
+        HttpResponse.json([{ symbol: "BTCUSDT", bidPrice: "95000", askPrice: "95001" }]),
+      ),
+    )
+    const prices = await fetchTokenPrices()
+    expect(prices.find((price) => price.symbol === "BTC")).toMatchObject({
+      source: "binance", minPrice: 95000, maxPrice: 95001,
+    })
   })
 })

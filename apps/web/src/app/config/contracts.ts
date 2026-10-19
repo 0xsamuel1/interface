@@ -12,8 +12,9 @@
  *   if (!CONTRACTS.stakingRouter) throw new Error("Staking not deployed")
  */
 
-import { getContractAddresses, type ContractAddresses } from "@workspace/contracts"
+import { getContractAddresses } from "@workspace/contracts"
 import { ENV } from "./env"
+import type { ContractAddresses } from "@workspace/contracts"
 
 export type { ContractAddresses }
 
