@@ -1037,9 +1037,42 @@
 }
 ::view-transition-old(root) { z-index: 1; }
 ::view-transition-new(root) { z-index: 2; }
+@keyframes so4-tick-flash-up {
+    from {
+        opacity: 0.35;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes so4-tick-flash-down {
+    from {
+        opacity: 0.35;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.so4-flash-up-overlay {
+    background-color: var(--color-long);
+    animation: so4-tick-flash-up var(--duration-slow) var(--ease-out) forwards;
+    pointer-events: none;
+    will-change: opacity;
+}
+
+.so4-flash-down-overlay {
+    background-color: var(--color-short);
+    animation: so4-tick-flash-down var(--duration-slow) var(--ease-out) forwards;
+    pointer-events: none;
+    will-change: opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .so4-confirm-check, .so4-confirm-moment { animation: none; }
     [data-slot="tooltip-content"] { transition: none; }
+    .so4-flash-up-overlay, .so4-flash-down-overlay { animation: none !important; opacity: 0 !important; }
 }
 :root[data-reduced-motion="true"] .so4-confirm-check,
 :root[data-reduced-motion="true"] .so4-confirm-moment { animation: none; }
